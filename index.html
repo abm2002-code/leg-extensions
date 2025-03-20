@@ -1,110 +1,285 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leg Raises Pose Detection</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
-    <style>
-        body { text-align: center; font-family: Arial, sans-serif; }
-        video, canvas { position: absolute; left: 50%; transform: translateX(-50%); top: 10%; }
-        #warning { position: absolute; top: 5%; left: 50%; transform: translateX(-50%); color: red; font-size: 24px; font-weight: bold; }
-        #debug { position: absolute; top: 80%; left: 10%; color: white; font-size: 14px; text-align: left; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leg Extensions Pose Detection</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+  <style>
+    /* FitFlex Theme - Black and Green */
+    :root {
+      --fitflex-green: #00ff7f;
+      --fitflex-dark: #121212;
+      --fitflex-darker: #0a0a0a;
+      --fitflex-light-dark: #1e1e1e;
+    }
+    
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--fitflex-darker);
+      color: white;
+    }
+    
+    .container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .app-header {
+      width: 100%;
+      background-color: var(--fitflex-dark);
+      padding: 12px 0;
+      text-align: center;
+      position: relative;
+      border-bottom: 1px solid rgba(0, 255, 127, 0.2);
+    }
+    
+    .app-title {
+      color: var(--fitflex-green);
+      font-size: 24px;
+      font-weight: bold;
+      margin: 0;
+    }
+    
+    .app-subtitle {
+      color: white;
+      font-size: 14px;
+      margin: 2px 0 0 0;
+    }
+    
+    .video-container {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      margin-top: 20px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid var(--fitflex-green);
+    }
+    
+    video, canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      position: relative;
+      left: 0;
+      transform: none;
+      top: 0;
+    }
+    
+    #warning {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #ff3b30;
+      font-size: 18px;
+      font-weight: bold;
+      text-shadow: 0px 0px 4px rgba(0, 0, 0, 0.8);
+      background-color: rgba(0, 0, 0, 0.6);
+      padding: 5px 15px;
+      border-radius: 20px;
+      z-index: 5;
+    }
+    
+    #debug {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 5;
+      border: 1px solid var(--fitflex-green);
+      color: var(--fitflex-green);
+      text-align: left;
+    }
+    
+    .angle-display {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 5;
+      border: 1px solid var(--fitflex-green);
+    }
+    
+    .angle-value {
+      color: var(--fitflex-green);
+      font-weight: bold;
+    }
+    
+    /* Responsive styles */
+    @media (max-width: 768px) {
+      .container {
+        padding: 0 10px;
+      }
+      
+      .video-container {
+        max-width: 100%;
+      }
+      
+      .app-title {
+        font-size: 20px;
+      }
+      
+      .app-subtitle {
+        font-size: 12px;
+      }
+      
+      #warning {
+        font-size: 14px;
+        padding: 4px 10px;
+      }
+      
+      #debug {
+        font-size: 12px;
+        padding: 4px 8px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      #warning {
+        font-size: 12px;
+        padding: 3px 8px;
+      }
+      
+      #debug {
+        font-size: 10px;
+      }
+      
+      .angle-display {
+        font-size: 12px;
+        padding: 4px 8px;
+      }
+    }
+  </style>
 </head>
 <body>
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
-    <div id="warning"></div>
-    <div id="debug"></div>
-    <audio id="audio" src="leg_raises.mp3" preload="auto"></audio>
+  <div class="container">
+    <div class="app-header">
+      <h1 class="app-title">FITFLEX</h1>
+      <p class="app-subtitle">Leg Extensions Pose Detection</p>
+    </div>
     
-    <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const warningText = document.getElementById('warning');
-        const debugText = document.getElementById('debug');
-        const audio = document.getElementById('audio');
-        
-        // Load the model (in a real implementation, you would load a trained model here)
-        // For this demo, we'll use a simple threshold-based approach
-        
-        const pose = new Pose({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
-        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    <div class="video-container">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="canvas"></canvas>
+      <div id="warning"></div>
+      <div id="debug"></div>
+      <div class="angle-display">
+        Knee Angle: <span id="knee-angle" class="angle-value">0°</span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Audio element - preserved exactly as in original -->
+  <audio id="audio" src="leg_raises.mp3" preload="auto"></audio>
+  
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const warningText = document.getElementById('warning');
+    const debugText = document.getElementById('debug');
+    const audio = document.getElementById('audio');
+    const kneeAngleElement = document.getElementById('knee-angle');
+    
+    // Load the model (in a real implementation, you would load a trained model here)
+    // For this demo, we'll use a simple threshold-based approach
+    
+    const pose = new Pose({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
+    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
-        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-            video.srcObject = stream;
-            video.onloadedmetadata = () => {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-            };
-        });
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+        };
+    });
 
-        function calculateAngle(a, b, c) {
-            const ba = { x: a.x - b.x, y: a.y - b.y };
-            const bc = { x: c.x - b.x, y: c.y - b.y };
-            const dotProduct = ba.x * bc.x + ba.y * bc.y;
-            const magnitudeBA = Math.sqrt(ba.x ** 2 + ba.y ** 2);
-            const magnitudeBC = Math.sqrt(bc.x ** 2 + bc.y ** 2);
-            const angle = Math.acos(dotProduct / (magnitudeBA * magnitudeBC)) * (180 / Math.PI);
-            return angle;
-        }
+    function calculateAngle(a, b, c) {
+        const ba = { x: a.x - b.x, y: a.y - b.y };
+        const bc = { x: c.x - b.x, y: c.y - b.y };
+        const dotProduct = ba.x * bc.x + ba.y * bc.y;
+        const magnitudeBA = Math.sqrt(ba.x ** 2 + ba.y ** 2);
+        const magnitudeBC = Math.sqrt(bc.x ** 2 + bc.y ** 2);
+        const angle = Math.acos(dotProduct / (magnitudeBA * magnitudeBC)) * (180 / Math.PI);
+        return angle;
+    }
 
-        pose.onResults(results => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    pose.onResults(results => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            if (results.poseLandmarks) {
-                // Draw pose landmarks and connections
-                drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
-                drawLandmarks(ctx, results.poseLandmarks, { color: '#FF0000', lineWidth: 2 });
+        if (results.poseLandmarks) {
+            // Draw pose landmarks and connections
+            drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF7F', lineWidth: 4 });
+            drawLandmarks(ctx, results.poseLandmarks, { color: '#FFFFFF', lineWidth: 2, radius: 6 });
 
-                const landmarks = results.poseLandmarks;
-                
-                // Get relevant landmarks for right knee angle
-                const rightHip = landmarks[24]; // RIGHT_HIP
-                const rightKnee = landmarks[26]; // RIGHT_KNEE
-                const rightAnkle = landmarks[28]; // RIGHT_ANKLE
-                
-                // Calculate knee angle for the right leg
-                const kneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
-                
-                // Display the angle on screen
-                ctx.fillStyle = "white";
-                ctx.font = "18px Arial";
-                ctx.fillText(`Right Knee Angle: ${Math.round(kneeAngle)}°`, 50, 50);
-                
-                // Simple classification based on knee angle
-                // In a real implementation, you would use the trained model here
-                let classification = "correct";
-                if (kneeAngle < 160) { // Example threshold
-                    classification = "incorrect";
-                }
-                
-                ctx.fillText(`Movement classification: ${classification}`, 50, 80);
-                
-                // Play audio if the movement is classified as incorrect
-                if (classification === "incorrect" && audio.paused) {
-                    warningText.innerText = "Incorrect Leg Raise Form!";
-                    audio.play();
-                } else if (classification === "correct") {
-                    warningText.innerText = "";
-                }
-                
-                // Debug information
-                debugText.innerText = `Knee Angle: ${Math.round(kneeAngle)}\nClassification: ${classification}`;
+            const landmarks = results.poseLandmarks;
+            
+            // Get relevant landmarks for right knee angle
+            const rightHip = landmarks[24]; // RIGHT_HIP
+            const rightKnee = landmarks[26]; // RIGHT_KNEE
+            const rightAnkle = landmarks[28]; // RIGHT_ANKLE
+            
+            // Calculate knee angle for the right leg
+            const kneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
+            
+            // Update angle display
+            kneeAngleElement.textContent = `${Math.round(kneeAngle)}°`;
+            
+            // Simple classification based on knee angle
+            // In a real implementation, you would use the trained model here
+            let classification = "correct";
+            if (kneeAngle < 160) { // Example threshold
+                classification = "incorrect";
             }
-        });
+            
+            // Play audio if the movement is classified as incorrect
+            if (classification === "incorrect" && audio.paused) {
+                warningText.innerText = "Incorrect Leg Extension Form!";
+                audio.play();
+            } else if (classification === "correct") {
+                warningText.innerText = "";
+            }
+            
+            // Debug information
+            debugText.innerHTML = `Knee Angle: ${Math.round(kneeAngle)}°<br>Classification: ${classification}`;
+        }
+    });
 
-        const camera = new Camera(video, {
-            onFrame: async () => { await pose.send({ image: video }); },
-            width: 640,
-            height: 480
-        });
-        camera.start();
-    </script>
+    const camera = new Camera(video, {
+        onFrame: async () => { await pose.send({ image: video }); },
+        width: 640,
+        height: 480
+    });
+    camera.start();
+    
+    // Handle window resize for responsiveness
+    window.addEventListener('resize', () => {
+        if (video.videoWidth > 0) {
+            const containerWidth = document.querySelector('.video-container').clientWidth;
+            const scale = containerWidth / video.videoWidth;
+            // Maintain aspect ratio
+            canvas.style.width = '100%';
+            canvas.style.height = 'auto';
+        }
+    });
+  </script>
 </body>
 </html>
